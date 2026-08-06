@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Saul — Knowledge Graph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://unpkg.com/force-graph@1.47.2/dist/force-graph.min.js"></script>
+<style>
+  :root { --bg:#1e1e2e; --panel:#27273a; --text:#cdd6f4; --muted:#7f849c; --accent:#89b4fa; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif; overflow:hidden; }
+  #graph { position:absolute; inset:0; }
+  #topbar { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; flex-direction:column; gap:8px; padding:10px 280px 10px 14px; background:linear-gradient(to bottom, rgba(30,30,46,.95), rgba(30,30,46,.75) 70%, transparent); pointer-events:none; }
+  #topbar > * { pointer-events:auto; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  #search { background:var(--panel); border:1px solid #383850; color:var(--text); border-radius:8px; padding:7px 12px; width:240px; outline:none; }
+  #search:focus { border-color:var(--accent); }
+  .chip { --c:#888; display:inline-flex; gap:6px; align-items:center; padding:5px 11px; border-radius:14px; border:1px solid #383850; background:var(--panel); color:var(--muted); cursor:pointer; user-select:none; font-size:12.5px; opacity:.4; filter:grayscale(.9); transition:opacity .12s, filter .12s; }
+  .chip:hover { opacity:.7; }
+  .chip.on { opacity:1; filter:none; color:var(--c); border-color:var(--c); background:color-mix(in srgb, var(--c) 18%, var(--panel)); }
+  .chip .dot { width:9px; height:9px; border-radius:50%; background:var(--c); }
+  .chip.on .dot { box-shadow:0 0 7px var(--c); }
+  .chip .n { opacity:.6; font-size:11px; }
+  .layer-chip { font-size:14px; font-weight:600; padding:7px 16px; border-radius:18px; }
+  .pm-chip { border-style:dashed; font-weight:600; }
+  .pm-chip.on { border-style:solid; }
+  #btn-all { font-weight:600; opacity:1; filter:none; color:var(--text); }
+  #panel { position:absolute; top:0; right:-380px; width:360px; height:100%; z-index:30; background:var(--panel); border-left:1px solid #383850; padding:18px; transition:right .18s ease; overflow-y:auto; }
+  #panel.open { right:0; }
+  #panel .cat { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+  #panel .date { color:var(--muted); font-size:12px; margin-left:8px; }
+  #panel .body { margin-top:12px; white-space:pre-wrap; word-wrap:break-word; }
+  #panel .close { position:absolute; top:10px; right:14px; cursor:pointer; color:var(--muted); font-size:20px; }
+  #stats { position:absolute; bottom:10px; left:14px; color:var(--muted); font-size:12px; z-index:10; }
+  #metric { position:absolute; top:76px; right:16px; z-index:20; width:230px; padding:16px 18px 14px; border-radius:14px;
+    background:linear-gradient(145deg, rgba(49,49,72,.92), rgba(39,39,58,.92));
+    border:1px solid transparent;
+    background-clip:padding-box; box-shadow:0 4px 24px rgba(0,0,0,.45), inset 0 0 0 1px rgba(137,180,250,.25); }
+  #metric .big { font-size:44px; font-weight:800; line-height:1;
+    background:linear-gradient(90deg,#89b4fa,#a6e3a1); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #metric .title { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+  #metric .dim { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:11.5px; color:var(--muted); }
+  #metric .dim span:first-child { width:74px; text-transform:capitalize; }
+  #metric .bar { flex:1; height:5px; border-radius:3px; background:#383850; overflow:hidden; }
+  #metric .bar i { display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,#89b4fa,#a6e3a1); }
+  #metric .dim b { width:30px; text-align:right; color:var(--text); font-size:11.5px; }
+  #metric .foot { margin-top:10px; font-size:10.5px; color:var(--muted); opacity:.8; }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+<div id="topbar">
+  <div class="row" id="layers">
+    <input id="search" type="search" placeholder="Search memories…">
+    <span class="chip" id="btn-all">Show all</span>
+  </div>
+  <div class="row" id="people"></div>
+  <div class="row" id="chips"></div>
+</div>
+<div id="metric" style="display:none">
+  <div class="big" id="m-big"></div>
+  <div class="title">Product context coverage</div>
+  <div id="m-dims"></div>
+  <div class="foot">Industry · business · product · user knowledge derived from this graph, 0–100%</div>
+</div>
+<div id="panel"><span class="close" onclick="panel.classList.remove('open')">×</span>
+  <div><span class="cat" id="p-cat"></span><span class="date" id="p-date"></span></div>
+  <div class="body" id="p-body"></div>
+</div>
+<div id="stats"></div>
+<script>
+const PALETTE = {
+  entity:'#f9e2af', project:'#89b4fa', contact:'#a6e3a1', research:'#f38ba8',
+  general:'#94a3b8', preference:'#cba6f7', schedule:'#fab387', feedback:'#f5c2e7',
+  identity:'#74c7ec', checkpoint:'#6c7086', reference:'#b4befe', model:'#eba0ac',
+  legal:'#f2cdcd', deadline:'#fca5a5', task_state:'#9399b2', work:'#89dceb',
+  health:'#a6e3a1', finance:'#f9e2af', 'joel-revelations':'#cba6f7'
+};
+const LAYER_COLORS = { product:'#89b4fa', contacts:'#a6e3a1', personal:'#cba6f7' };
+const LAYER_ORDER = ['product','contacts','personal'];
+const panel = document.getElementById('panel');
+const PM_META = {
+  petrov:   {label:'Buyer & Seller Experience', name:'Ivan Petrov',      color:'#f38ba8'},
+  kovalev:{label:'Platform',                  name:'Andrei Kovalev',color:'#fab387'},
+  dana:    {label:'Pay & Ship',                name:'Dana Abdullaeva',  color:'#94e2d5'},
+};
+let DATA, activeLayers = new Set(LAYER_ORDER), activeTypes, allTypes = [], query = '', activePM = new Set();
+
+fetch('graph.json').then(r => r.json()).then(data => {
+  DATA = data;
+  const typeCounts = {}, layerCounts = {};
+  data.nodes.forEach(n => {
+    typeCounts[n.type] = (typeCounts[n.type]||0)+1;
+    layerCounts[n.layer] = (layerCounts[n.layer]||0)+1;
+  });
+  allTypes = Object.keys(typeCounts);
+  activeTypes = new Set(allTypes);
+
+  const layerRow = document.getElementById('layers');
+  LAYER_ORDER.forEach(layer => {
+    const el = document.createElement('span');
+    el.className = 'chip layer-chip'; el.dataset.layer = layer;
+    el.innerHTML = `<span class="dot"></span>${layer[0].toUpperCase()+layer.slice(1)}<span class="n">${layerCounts[layer]||0}</span>`;
+    el.style.setProperty('--c', LAYER_COLORS[layer]);
+    el.onclick = () => { activeLayers.has(layer) ? activeLayers.delete(layer) : activeLayers.add(layer); render(); };
+    layerRow.appendChild(el);
+  });
+
+  const pmCounts = {};
+  data.nodes.forEach(n => (n.pm||[]).forEach(p => pmCounts[p] = (pmCounts[p]||0)+1));
+  const pmRow = document.getElementById('people');
+  Object.entries(PM_META).forEach(([key, meta]) => {
+    const el = document.createElement('span');
+    el.className = 'chip pm-chip'; el.dataset.pm = key;
+    el.innerHTML = `<span class="dot"></span>${meta.label}<span class="n">${pmCounts[key]||0}</span>`;
+    el.title = meta.name;
+    el.style.setProperty('--c', meta.color);
+    el.onclick = () => { activePM.has(key) ? activePM.delete(key) : activePM.add(key); render(); };
+    pmRow.appendChild(el);
+  });
+
+  const chips = document.getElementById('chips');
+  Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).forEach(([type,n]) => {
+    const el = document.createElement('span');
+    el.className = 'chip'; el.dataset.type = type;
+    el.innerHTML = `<span class="dot"></span>${type}<span class="n">${n}</span>`;
+    el.style.setProperty('--c', PALETTE[type]||'#888');
+    el.onclick = () => { activeTypes.has(type) ? activeTypes.delete(type) : activeTypes.add(type); render(); };
+    chips.appendChild(el);
+  });
+
+  document.getElementById('btn-all').onclick = () => {
+    activeLayers = new Set(LAYER_ORDER); activeTypes = new Set(allTypes);
+    activePM = new Set();
+    document.getElementById('search').value = ''; query = '';
+    render();
+  };
+  let t; document.getElementById('search').oninput = e => {
+    clearTimeout(t); t = setTimeout(() => { query = e.target.value.trim().toLowerCase(); render(); }, 250);
+  };
+
+  render();
+});
+
+const Graph = ForceGraph()(document.getElementById('graph'))
+  .backgroundColor('#1e1e2e')
+  .nodeLabel(n => `<div style="max-width:300px"><b style="color:${PALETTE[n.type]||'#888'}">${n.layer} / ${n.type}</b> ${esc(n.label)}</div>`)
+  .nodeColor(n => n._dim ? 'rgba(80,80,100,0.25)' : (PALETTE[n.type]||'#888'))
+  .nodeVal(n => n._sz)
+  .linkColor(() => 'rgba(120,120,150,0.18)')
+  .linkWidth(l => l.w >= 0.9 ? 1.2 : 0.5)
+  .onNodeClick(n => {
+    document.getElementById('p-cat').textContent = `${n.layer} · ${n.type}`;
+    document.getElementById('p-date').textContent = n.date || '';
+    document.getElementById('p-body').textContent = n.text;
+    panel.classList.add('open');
+  })
+  .cooldownTicks(200)
+  .warmupTicks(60);
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function showMetric(){
+  if (!DATA.metric) return;
+  const one = activePM.size === 1 ? [...activePM][0] : null;
+  const m = (one && DATA.domain_metrics && DATA.domain_metrics[one]) ? DATA.domain_metrics[one] : DATA.metric;
+  document.getElementById('m-big').textContent = m.overall + '%';
+  document.querySelector('#metric .title').textContent =
+    (one ? PM_META[one].label : 'Product') + ' context coverage';
+  const dims = document.getElementById('m-dims');
+  dims.innerHTML = '';
+  for (const [dim, v] of Object.entries(m.dims)) {
+    dims.insertAdjacentHTML('beforeend',
+      `<div class="dim"><span>${dim}</span><span class="bar"><i style="width:${v}%"></i></span><b>${v}</b></div>`);
+  }
+  document.querySelector('#metric .foot').textContent =
+    Object.keys(m.dims).join(' · ') + ' knowledge derived from this graph, 0–100%';
+  document.getElementById('metric').style.display = 'block';
+}
+
+function render(){
+  showMetric();
+  document.querySelectorAll('.layer-chip').forEach(el =>
+    el.classList.toggle('on', activeLayers.has(el.dataset.layer)));
+  document.querySelectorAll('#chips .chip').forEach(el =>
+    el.classList.toggle('on', activeTypes.has(el.dataset.type)));
+  document.querySelectorAll('.pm-chip').forEach(el =>
+    el.classList.toggle('on', activePM.has(el.dataset.pm)));
+  const nodes = DATA.nodes.filter(n =>
+    activeLayers.has(n.layer) && activeTypes.has(n.type) &&
+    (!activePM.size || (n.pm||[]).some(p => activePM.has(p))));
+  const idset = new Set(nodes.map(n => n.id));
+  const links = DATA.links
+    .filter(l => idset.has(l.source.id ?? l.source) && idset.has(l.target.id ?? l.target))
+    .map(l => ({source: l.source.id ?? l.source, target: l.target.id ?? l.target, w: l.w}));
+  const deg = {};
+  links.forEach(l => { deg[l.source]=(deg[l.source]||0)+1; deg[l.target]=(deg[l.target]||0)+1; });
+  nodes.forEach(n => {
+    n._sz = Math.min(1 + (deg[n.id]||0)*0.5, n.type==='entity' ? 30 : 12);
+    n._dim = query && !(n.text.toLowerCase().includes(query) || n.label.toLowerCase().includes(query));
+  });
+  Graph.graphData({nodes, links});
+  const hits = query ? nodes.filter(n=>!n._dim).length : nodes.length;
+  document.getElementById('stats').textContent =
+    `${nodes.length} nodes · ${links.length} links` + (query ? ` · ${hits} match "${query}"` : '');
+}
+</script>
+</body>
+</html>

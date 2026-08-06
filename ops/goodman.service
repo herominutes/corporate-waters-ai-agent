@@ -1,0 +1,15 @@
+[Unit]
+Description=The Goodman Protocol - Personal Executive Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=claude
+WorkingDirectory=/home/claude/goodman
+ExecStart=/bin/bash /home/claude/goodman/run.sh
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONPATH=/home/claude/goodman/src
+
+[Install]
+WantedBy=multi-user.target

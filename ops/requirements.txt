@@ -1,0 +1,52 @@
+# The Goodman Protocol — runtime dependencies (pinned to the working host, 2026-06-30).
+# Install: python3 -m pip install -r requirements.txt
+# pip resolves transitive deps automatically. System extras (apt) noted in SETUP.md.
+
+# --- Messaging / chat platforms ---
+python-telegram-bot==22.6
+Telethon==1.42.0
+slack_bolt==1.27.0
+slack_sdk==3.40.0
+
+# --- LLM / AI SDKs (brain primarily shells out to the `claude` CLI; these are for tools) ---
+anthropic==0.83.0
+openai==2.23.0
+google-genai==1.64.0
+
+# --- Google Workspace (calendar / gmail / docs) ---
+google-api-python-client==2.190.0
+google-auth==2.48.0
+google-auth-oauthlib==1.2.4
+google-auth-httplib2==0.3.0
+
+# --- Web fetch / browser automation ---
+httpx==0.28.1
+aiohttp==3.13.3
+requests==2.31.0
+playwright==1.58.0
+patchright==1.58.0
+playwright-stealth==2.0.2
+readability-lxml==0.8.4.1
+html2text==2025.4.15
+beautifulsoup4==4.14.3
+lxml==6.0.2
+
+# --- Audio transcription / media ---
+faster-whisper==1.2.1
+yt-dlp==2026.5.5.233942.dev0
+
+# --- Embeddings / memory scoring ---
+sentence-transformers==5.2.3
+
+# --- Images (stat cards / memes) ---
+pillow==10.2.0
+matplotlib==3.10.8
+
+# --- Storage / config / misc ---
+aiosqlite==0.22.1
+python-dotenv==1.2.1
+cryptography==48.0.0
+pydantic==2.12.5
+tenacity==9.1.4
+websockets==15.0.1
+pytz==2024.1

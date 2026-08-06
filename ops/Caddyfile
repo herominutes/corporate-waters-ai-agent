@@ -1,0 +1,36 @@
+demo-host.example.com {
+	handle /files/* {
+		root * /home/claude/public_files
+		uri strip_prefix /files
+		file_server
+	}
+	handle /protos/* {
+		root * /home/claude/goodman/data/protos
+		uri strip_prefix /protos
+		file_server
+	}
+	handle /graph/* {
+		basic_auth {
+			alex <bcrypt-hash-redacted>
+		}
+		root * /home/claude/goodman/data/graph
+		uri strip_prefix /graph
+		file_server
+	}
+	handle /portfolio/* {
+		basic_auth {
+			alex <bcrypt-hash-redacted>
+		}
+		root * /home/claude/www
+		file_server
+	}
+	handle {
+		reverse_proxy localhost:8081
+	}
+}
+
+:8080 {
+	root * /home/claude/ai-town/dist
+	file_server
+	try_files {path} /index.html
+}

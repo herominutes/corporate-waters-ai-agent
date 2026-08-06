@@ -1,0 +1,13 @@
+[project]
+name = "goodman-protocol"
+version = "0.1.0"
+description = "The Goodman Protocol - Personal Executive Assistant with a Saul Goodman persona"
+requires-python = ">=3.11"
+dependencies = [
+    "python-telegram-bot>=21.0",
+    "python-dotenv>=1.0",
+    "aiosqlite>=0.20",
+]
+
+[project.scripts]
+goodman = "goodman.bot:main"
